@@ -117,7 +117,20 @@ function resolveAppVariant(value: string | undefined): AppVariant {
   }
 }
 
-const variant = VARIANT_CONFIG[APP_VARIANT];
+const baseVariant = VARIANT_CONFIG[APP_VARIANT];
+const appDisplayNameOverride = repoEnv.T3CODE_APP_DISPLAY_NAME?.trim() || undefined;
+const appIconOverride = repoEnv.T3CODE_APP_ICON?.trim() || undefined;
+const variant = {
+  ...baseVariant,
+  assets: appIconOverride
+    ? {
+        ...baseVariant.assets,
+        appIcon: fromRepoRoot(appIconOverride),
+        iosIcon: fromRepoRoot(appIconOverride),
+        splashIcon: fromRepoRoot(appIconOverride),
+      }
+    : baseVariant.assets,
+};
 // Copied thread links open the app. app.t3.codes/.well-known lists every variant's identifiers.
 const HOSTED_APP_HOST = "app.t3.codes";
 const iosBundleIdentifier = isIosPersonalTeamBuild
@@ -257,16 +270,18 @@ const config: ExpoConfig = {
     requireFullScreen: process.env.T3_SHOWCASE_CAPTURE_BUILD === "1",
     bundleIdentifier: iosBundleIdentifier,
     // Avoid Personal Team fallback: it cannot sign App Groups, Apple sign-in or push entitlements.
-    appleTeamId: "ARK85ZXQ4Z",
+    appleTeamId: repoEnv.T3CODE_APPLE_TEAM_ID?.trim() || "ARK85ZXQ4Z",
     associatedDomains: [
       `applinks:${variant.relyingParty}`,
       `webcredentials:${variant.relyingParty}`,
       `applinks:${HOSTED_APP_HOST}`,
     ],
     entitlements: {
-      "keychain-access-groups": [`$(AppIdentifierPrefix)${variant.iosBundleIdentifier}`],
+      "keychain-access-groups": [`$(AppIdentifierPrefix)${iosBundleIdentifier}`],
     },
     infoPlist: {
+      // display name only: changing `name` would rename the generated Xcode project
+      ...(appDisplayNameOverride ? { CFBundleDisplayName: appDisplayNameOverride } : {}),
       UISupportedInterfaceOrientations: [
         "UIInterfaceOrientationPortrait",
         "UIInterfaceOrientationLandscapeLeft",
